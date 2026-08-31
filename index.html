@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>⛏️ Guía de Minecraft — Entrar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { min-height: 100vh; font-family: 'VT323', monospace; font-size: 20px; color: #fff;
+         background: linear-gradient(180deg,#79b94c 0,#5fa83a 120px,#6d4c2f 120px,#5a3d24 100%);
+         display: flex; flex-direction: column; align-items: center; padding: 24px 16px; }
+  h1 { font-family: 'Press Start 2P', monospace; font-size: 20px; text-shadow: 2px 2px 0 #000;
+       margin: 18px 0 6px; text-align: center; line-height: 1.6; }
+  .sub { color: #eaffd9; text-shadow: 1px 1px 0 #000; margin-bottom: 22px; text-align: center; }
+  .panel { background: rgba(20,16,12,.88); border: 4px solid #2b2119; box-shadow: 0 0 0 4px #4a3826, 6px 6px 0 rgba(0,0,0,.4);
+           padding: 26px 28px; width: 100%; max-width: 460px; }
+  label { display: block; margin: 14px 0 4px; color: #cfe8b8; }
+  input { width: 100%; padding: 10px 12px; font-family: 'VT323', monospace; font-size: 20px;
+          background: #1d1712; color: #fff; border: 3px solid #4a3826; outline: none; }
+  input:focus { border-color: #5fa83a; }
+  .mc-btn { display: inline-block; margin-top: 18px; width: 100%; padding: 12px; cursor: pointer;
+            font-family: 'Press Start 2P', monospace; font-size: 12px; color: #fff;
+            background: linear-gradient(180deg,#5fa83a,#4a8c2a); border: 3px solid #2b2119;
+            box-shadow: inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.3); }
+  .mc-btn:hover { filter: brightness(1.1); }
+  .mc-btn[disabled] { filter: grayscale(.6); cursor: wait; }
+  .error { background: #7a2a1e; border: 3px solid #3d130c; padding: 10px 12px; margin-top: 14px; display: none; }
+  .features { list-style: none; margin: 14px 0 4px; padding: 0; color: #eaffd9; }
+  .features li { margin: 8px 0; }
+</style></head><body>
+  <h1>🟩 GUÍA DE MINECRAFT ⛏️</h1>
+  <div class="sub">Tutoriales bloque a bloque para constructores pro</div>
+  <div class="panel">
+    <p style="color:#eaffd9">Una colección privada de tutoriales de construcción para
+    Minecraft Bedrock: casas temáticas, bases secretas, redstone y más.</p>
+    <ul class="features">
+      <li>🏛️ Construcciones paso a paso con planos y coordenadas exactas</li>
+      <li>🎬 Vídeos con saltos por capítulo y lista de materiales</li>
+      <li>🧱 Mundos descargables (.mcstructure) para importar</li>
+    </ul>
+    <p style="color:#cfe8b8;margin-top:10px">Zona privada: pide tu usuario al administrador.</p>
+    <form id="f">
+      <label for="u">Usuario</label>
+      <input id="u" autocomplete="username" autofocus required>
+      <label for="p">Contraseña</label>
+      <input id="p" type="password" autocomplete="current-password" required>
+      <div class="error" id="err">⚠️ Usuario o contraseña incorrectos.</div>
+      <button class="mc-btn" id="go" type="submit">▶ ENTRAR</button>
+    </form>
+  </div>
+  <footer style="margin-top:22px;font-size:15px;opacity:.75;text-shadow:1px 1px 0 #000;text-align:center">
+    No es un producto oficial de Minecraft. No aprobado por ni asociado a Mojang o Microsoft.
+  </footer>
+<script>
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+function idb(mode, fn) {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('mc-auth', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('keys');
+    r.onerror = () => rej(r.error);
+    r.onsuccess = () => {
+      const tx = r.result.transaction('keys', mode);
+      const req = fn(tx.objectStore('keys'));
+      tx.oncomplete = () => res(req.result);
+      tx.onerror = () => rej(tx.error);
+    };
+  });
+}
+const getKey = () => idb('readonly', s => s.get('master')).catch(() => null);
+const putKey = k => idb('readwrite', s => s.put(k, 'master'));
+
+async function enter() {
+  await navigator.serviceWorker.register('sw.js');
+  await navigator.serviceWorker.ready;
+  location.href = 'app/';
+}
+
+// sesión ya abierta en este navegador -> directo a la guía
+getKey().then(k => { if (k) enter(); });
+
+document.getElementById('f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const err = document.getElementById('err'), btn = document.getElementById('go');
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '⌛ COMPROBANDO…';
+  try {
+    if (!('serviceWorker' in navigator) || !crypto.subtle)
+      throw new Error('Este navegador no soporta el modo seguro (usa uno moderno con HTTPS).');
+    const db = await fetch('users.json', {cache: 'no-store'}).then(r => r.json());
+    const uname = document.getElementById('u').value.trim().toLowerCase();
+    const u = db.users.find(x => x.u === uname);
+    if (!u) throw new Error('bad');
+    const raw = await crypto.subtle.importKey('raw',
+      new TextEncoder().encode(document.getElementById('p').value), 'PBKDF2', false, ['deriveKey']);
+    const kek = await crypto.subtle.deriveKey(
+      {name: 'PBKDF2', salt: b64d(u.salt), iterations: db.iterations, hash: 'SHA-256'},
+      raw, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+    const master = await crypto.subtle.decrypt(  // falla (throw) si la contraseña es mala
+      {name: 'AES-GCM', iv: b64d(u.iv)}, kek, b64d(u.wrap));
+    await putKey(new Uint8Array(master));
+    await enter();
+  } catch (e) {
+    err.textContent = e.message === 'bad' || e.name === 'OperationError'
+      ? '⚠️ Usuario o contraseña incorrectos.' : '⚠️ ' + e.message;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = '▶ ENTRAR';
+  }
+});
+</script>
+</body></html>
