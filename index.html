@@ -101,6 +101,7 @@ document.getElementById('f').addEventListener('submit', async ev => {
     const master = await crypto.subtle.decrypt(  // falla (throw) si la contraseña es mala
       {name: 'AES-GCM', iv: b64d(u.iv)}, kek, b64d(u.wrap));
     await putKey(new Uint8Array(master));
+    try { localStorage.setItem('mc_user', uname); } catch (e) {}
     await enter();
   } catch (e) {
     err.textContent = e.message === 'bad' || e.name === 'OperationError'
